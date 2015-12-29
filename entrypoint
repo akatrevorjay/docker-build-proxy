@@ -1,0 +1,20 @@
+#!/bin/bash
+set -xv
+
+find "$CONFIG_DIR" "/usr/share/squid-deb-proxy" -type f \
+    | xargs sed -i.orig \
+        -e 's|/etc/squid-deb-proxy|$CONFIG_DIR|g' \
+        -e 's|/var/cache/squid-deb-proxy|$CACHE_DIR|g' \
+        -e 's|/var/log/squid-deb-proxy|$LOG_DIR|g' \
+        -e "s|\$CONFIG_DIR|$CONFIG_DIR|g" \
+        -e "s|\$CACHE_DIR|$CACHE_DIR|g" \
+        -e "s|\$LOG_DIR|$LOG_DIR|g"
+
+. /usr/share/squid-deb-proxy/init-common.sh
+pre_start
+"$@" &
+post_start
+tail -qF $LOG_DIR/{access,cache,store}.log &
+wait -n
+post_stop
+
