@@ -1,0 +1,2 @@
+(docker stop docker-build-proxy; docker rm docker-build-proxy) || :
+docker run -p 3142:3142 -d --restart=always --name docker-build-proxy docker-build-proxy
