@@ -1,20 +1,43 @@
 #!/bin/bash
+set -eo pipefail
 set -xv
 
-find "$CONFIG_DIR" "/usr/share/squid-deb-proxy" -type f \
-    | xargs sed -i.orig \
-        -e 's|/etc/squid-deb-proxy|$CONFIG_DIR|g' \
-        -e 's|/var/cache/squid-deb-proxy|$CACHE_DIR|g' \
-        -e 's|/var/log/squid-deb-proxy|$LOG_DIR|g' \
-        -e "s|\$CONFIG_DIR|$CONFIG_DIR|g" \
-        -e "s|\$CACHE_DIR|$CACHE_DIR|g" \
-        -e "s|\$LOG_DIR|$LOG_DIR|g"
+_template_config() {
+    find "$CONFIG_DIR" "/usr/share/squid-deb-proxy" -type f \
+        | xargs sed -i.orig \
+            -e 's|/etc/squid-deb-proxy|$CONFIG_DIR|g' \
+            -e 's|/var/cache/squid-deb-proxy|$CACHE_DIR|g' \
+            -e 's|/var/log/squid-deb-proxy|$LOG_DIR|g' \
+            -e "s|\$CONFIG_DIR|$CONFIG_DIR|g" \
+            -e "s|\$CACHE_DIR|$CACHE_DIR|g" \
+            -e "s|\$LOG_DIR|$LOG_DIR|g"
+}
 
-. /usr/share/squid-deb-proxy/init-common.sh
-pre_start
-"$@" &
-post_start
-tail -qF $LOG_DIR/{access,cache,store}.log &
-wait -n
-post_stop
+_start_emulate_events_and_tail_log() {
+    . /usr/share/squid-deb-proxy/init-common.sh
+
+    pre_start
+    "$@" &
+    if [[ "$TAIL_LOGS" == "true" ]]; then
+        tail -qF $LOG_DIR/{access,cache,store}.log &
+    fi
+    post_start
+
+    # Wait for jobs to finish
+    wait -n
+
+    post_stop
+}
+
+
+main() {
+    template_config
+
+    if [[ "$TAIL_LOGS" == "true" ]]; then
+        
+    fi
+
+    if [[ $# -gt 0 ]]; then
+    fi
+}
 

@@ -6,6 +6,6 @@ repo_name="$(basename "$dir_name")"
 : ${PROJECT="$(basename "$dir_name")"}
 
 : ${TAG:="build"}
-: ${IMAGE:="docker.vkportal.com/vk/$repo_name:${TAG}"}
+: ${IMAGE:="${namespace}$repo_name:${TAG}"}
 
 exec docker build -t "$repo_name" .
