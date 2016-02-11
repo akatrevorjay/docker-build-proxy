@@ -1,6 +1,6 @@
 #!/bin/bash
 set -eo pipefail
-set -xv
+[[ -z "$DEBUG" ]] || set -xv
 
 _template_config() {
     find "$CONFIG_DIR" "/usr/share/squid-deb-proxy" -type f \
@@ -31,13 +31,8 @@ _start_emulate_events_and_tail_log() {
 
 
 main() {
-    template_config
-
-    if [[ "$TAIL_LOGS" == "true" ]]; then
-        
-    fi
-
-    if [[ $# -gt 0 ]]; then
-    fi
+    _template_config
+    _start_emulate_events_and_tail_log "$@"
 }
 
+main "$@"

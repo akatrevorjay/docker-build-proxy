@@ -18,9 +18,8 @@ ENV CONFIG_DIR /etc/squid-deb-proxy
 ENV CACHE_DIR $DATA_ROOT/cache
 ENV LOG_DIR $DATA_ROOT/logs
 
-COPY squid.conf $CONFIG_DIR/squid-deb-proxy.conf
-
-COPY entrypoint /
+COPY image/squid.conf $CONFIG_DIR/squid-deb-proxy.conf
+COPY image/entrypoint /
 ENTRYPOINT ["/entrypoint"]
 CMD squid3 -N -f $CONFIG_DIR/squid-deb-proxy.conf
 
