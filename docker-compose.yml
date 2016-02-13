@@ -1,8 +1,13 @@
 version: '2'
 services:
-    app:
-        build: .
-        ports:
-            - "3142:3142"
-        restart: always
+  app:
+    image: trevorj/docker-build-proxy
+    build:
+      context: .
+      args:
+        - http_proxy
+        - https_proxy
+    ports:
+      - "3142:3142"
+    restart: always
 

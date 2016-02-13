@@ -1,0 +1,83 @@
+#!/bin/bash
+# ______________________
+# docker-machine-wrapper: Wraps a command with your docker-machine dev environment
+#
+# * Put a directory in the beginning of $PATH somewhere in your shell init,
+#   ala ~/.bashrc, with a line such as the following at the end of the file:
+#
+#     export PATH="$HOME/.bin:$PATH"
+#
+#   Then save this file as "$HOME/.bin/docker". You can symlink it to the same
+#   basename as the anything you want to give a default machine env to, say:
+#
+#     cd ~/.bin; ln -s docker docker-compose
+#
+
+# Be safe wary traveller
+set -eo pipefail
+
+# Set this in your .bashrc if it's different
+: ${DOCKER_MACHINE_NAME:="dev"}
+
+# Cache the output so we don't have to run it every time (per machine)
+: ${DOCKER_MACHINE_ENV_CACHE:="true"}
+# (cache is stored per docker-machine)
+: ${DOCKER_MACHINE_ENV_CACHE_FILE:="$HOME/.docker-machine-env-cache-$DOCKER_MACHINE_NAME"}
+
+function docker-machine-env {
+docker-machine env "$DOCKER_MACHINE_NAME"
+}
+
+# If we need to eval docker-machine env, do so
+if [[ -z "$DOCKER_HOST" ]]; then
+  if [[ "$DOCKER_MACHINE_ENV_CACHE" == "true" ]]; then
+    [[ -f "$DOCKER_MACHINE_ENV_CACHE_FILE" ]] \
+      || docker-machine-env > "$DOCKER_MACHINE_ENV_CACHE_FILE"
+    source "$DOCKER_MACHINE_ENV_CACHE_FILE"
+  else
+    source <(docker-machine-env)
+  fi
+fi
+
+# Override these in your .bashrc if you want.
+: ${DOCKER_BUILD_PROXY_HTTP:="http://$DOCKER_HOST:$PROXY_PORT"}
+
+# Find wrapped executable in PATH
+self=$(basename "$0")
+abs_self=$(realpath -es "$0")
+
+# Get our target
+for path in $(type -pa "$self"); do
+  # Verify absolute paths don't match ourselves (fruity loops detection)
+  abs_path=$(realpath -es "$path")
+  [[ "$abs_path" != "$abs_self" ]] || continue
+
+  # We have a winner
+  target="$path"
+  break
+done
+
+# Assert target
+[[ -n "$target" ]] \
+  || (echo "Could not find wrapped target \"$self\" in PATH." >&2; exit 1)
+
+# Target specifics
+case "$self" in
+  docker)
+    # Builds utilize docker-build-proxy automagically
+    # >> docker-compose variables must be specified in the compose file under build:args: like so:
+    #
+    # build:
+    #   args:
+    #     - http_proxy
+    #
+    if [[ $1 == 'build' && -z "$NOPROXY" ]]; then
+      set -- "$1" \
+        --build-arg http_proxy="$HTTP_PROXY" \
+        "${@:2}"
+    fi
+    ;;
+esac
+
+set -x
+exec "$target" "$@"
