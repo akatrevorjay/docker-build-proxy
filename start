@@ -1,3 +1,0 @@
-#!/bin/bash -exv
-[[ -n "$*" ]] || set -- squid3 -N
-exec "$@"
