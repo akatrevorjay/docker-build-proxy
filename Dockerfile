@@ -7,7 +7,10 @@ RUN apt-get update -q \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
     && :
 
-ARG DOCKERIZE_VERSION=0.2.0
+# So the docker hub doesn't support build time arguments even with a default set?
+# That is nearing the epitome of stupid.
+#ARG DOCKERIZE_VERSION 0.2.0
+ENV DOCKERIZE_VERSION 0.2.0
 RUN curl -sSL "https://github.com/jwilder/dockerize/releases/download/v${DOCKERIZE_VERSION}/dockerize-linux-amd64-v${DOCKERIZE_VERSION}.tar.gz" \
       | tar -C /usr/local/bin -xzv \
     && chmod +x /usr/local/bin/dockerize \
