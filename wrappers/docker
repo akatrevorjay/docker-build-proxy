@@ -12,35 +12,41 @@
 #
 #     cd ~/.bin; ln -s docker docker-compose
 #
+#
+#   Set this in your .bashrc if it's used and you want this script to
+#   automatically source a certain machine's env:
+#
+#     DOCKER_MACHINE_NAME=dev
+#
 
 # Be safe wary traveller
 set -eo pipefail
 
-# Set this in your .bashrc if it's different
-: ${DOCKER_MACHINE_NAME:="dev"}
+# Nab docker-machine vars if necessary
+if [[ -n "$DOCKER_MACHINE_NAME" ]]; then
+    # Cache the output so we don't have to run it every time (per machine)
+    : ${DOCKER_MACHINE_ENV_CACHE:="true"}
+    # (cache is stored per docker-machine)
+    : ${DOCKER_MACHINE_ENV_CACHE_FILE:="$HOME/.docker-machine-env-cache-$DOCKER_MACHINE_NAME"}
 
-# Cache the output so we don't have to run it every time (per machine)
-: ${DOCKER_MACHINE_ENV_CACHE:="true"}
-# (cache is stored per docker-machine)
-: ${DOCKER_MACHINE_ENV_CACHE_FILE:="$HOME/.docker-machine-env-cache-$DOCKER_MACHINE_NAME"}
+    docker-machine-env() {
+        docker-machine env "$DOCKER_MACHINE_NAME"
+    }
 
-function docker-machine-env {
-docker-machine env "$DOCKER_MACHINE_NAME"
-}
-
-# If we need to eval docker-machine env, do so
-if [[ -z "$DOCKER_HOST" ]]; then
-  if [[ "$DOCKER_MACHINE_ENV_CACHE" == "true" ]]; then
-    [[ -f "$DOCKER_MACHINE_ENV_CACHE_FILE" ]] \
-      || docker-machine-env > "$DOCKER_MACHINE_ENV_CACHE_FILE"
-    source "$DOCKER_MACHINE_ENV_CACHE_FILE"
-  else
-    source <(docker-machine-env)
-  fi
+    # If we need to eval docker-machine env, do so
+    if [[ -z "$DOCKER_HOST" ]]; then
+        if [[ "$DOCKER_MACHINE_ENV_CACHE" == "true" ]]; then
+            [[ -f "$DOCKER_MACHINE_ENV_CACHE_FILE" ]] \
+                || docker-machine-env > "$DOCKER_MACHINE_ENV_CACHE_FILE"
+            source "$DOCKER_MACHINE_ENV_CACHE_FILE"
+        else
+            source <(docker-machine-env)
+        fi
+    fi
 fi
 
 # Override these in your .bashrc if you want.
-: ${DOCKER_BUILD_PROXY_HTTP:="http://$DOCKER_HOST:$PROXY_PORT"}
+: ${DOCKER_BUILD_HTTP_PROXY:="http://$DOCKER_HOST:$PROXY_PORT"}
 
 # Find wrapped executable in PATH
 self=$(basename "$0")
@@ -48,37 +54,36 @@ abs_self=$(realpath -es "$0")
 
 # Get our target
 for path in $(type -pa "$self"); do
-  # Verify absolute paths don't match ourselves (fruity loops detection)
-  abs_path=$(realpath -es "$path")
-  [[ "$abs_path" != "$abs_self" ]] || continue
+    # Verify absolute paths don't match ourselves (fruity loops detection)
+    abs_path=$(realpath -es "$path")
+    [[ "$abs_path" != "$abs_self" ]] || continue
 
-  # We have a winner
-  target="$path"
-  break
+    # We have a winner
+    target="$path"
+    break
 done
 
 # Assert target
 [[ -n "$target" ]] \
-  || (echo "Could not find wrapped target \"$self\" in PATH." >&2; exit 1)
+    || (echo "Could not find wrapped target \"$self\" in PATH." >&2; exit 1)
 
 # Target specifics
 case "$self" in
-  docker)
-    # Builds utilize docker-build-proxy automagically
-    # >> docker-compose variables must be specified in the compose file under build:args: like so:
-    #
-    # build:
-    #   args:
-    #     - http_proxy
-    #
-    if [[ $1 == 'build' && -z "$NOPROXY" ]]; then
-      set -- "$1" \
-        --build-arg http_proxy="$HTTP_PROXY" \
-        "${@:2}"
-    fi
-    ;;
+    docker)
+        # Builds utilize docker-build-proxy automagically
+        # >> docker-compose variables must be specified in the compose file under build:args: like so:
+        #
+        # build:
+        #   args:
+        #     - http_proxy
+        #
+        if [[ $1 == 'build' && -z "$NOPROXY" ]]; then
+            set -- "$1" \
+                --build-arg http_proxy="$DOCKER_BUILD_HTTP_PROXY" \
+                "${@:2}"
+        fi
+        ;;
 esac
 
-set -x
-export HTTP_PROXY="$DOCKER_BUILD_PROXY_HTTP"
+#set -x
 exec "$target" "$@"

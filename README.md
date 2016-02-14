@@ -18,6 +18,14 @@ docker-compose up
 This compose file sets `restart=always`, making sure it's always available when you need it.
 *Due to this, the provided `docker-compose.yml` file requires `docker-compose`>=1.6.0 due to it's requirement on version 2 syntax.*
 
+You'll then need to wrap `docker` and `docker-compose` by putting the provided script in your local user `PATH`, somewhere before the wrapped commands.
+If you don't have one of these setup:
+
+```sh
+mkdir -p "$HOME/bin"
+echo 'PATH="$HOME/bin:$PATH"' >> ~/.bashrc
+```
+
 Troubleshooting
 ---------------
 
