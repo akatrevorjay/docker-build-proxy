@@ -2,8 +2,6 @@
 set -eo pipefail
 [[ -z "$DEBUG" ]] || set -xv
 
-generate-cert
-
 logs=("$LOG_DIR/access.log" "$LOG_DIR/cache.log" "$LOG_DIR/store.log")
 
 if [[ "$LOG_FIFO" == "true" ]]; then
@@ -27,6 +25,10 @@ if [[ "$1" = squid* ]]; then
     set -- dockerize \
         $(for log in "${logs[@]}"; do echo -e " -stdout \"$log\" "; done) \
         "$@"
+fi
+
+if [[ -n "$SSL_BUMP_PORT" ]]; then
+    generate-cert
 fi
 
 if [[ -n "$TRANSPARENT_PORT" ]]; then

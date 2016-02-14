@@ -23,13 +23,9 @@ ENV APP_ROOT="/app" \
     CACHE_DIR="/var/cache/squid3" \
     CACHE_MEM="64 MB" \
     MAX_OBJECT_SIZE_IN_MEMORY="10240 KB" \
-    HTTP_PORT=3142 \
-    TRANSPARENT_PORT=3080 \
-    SSL_BUMP_PORT=3443 \
-    SSL_CERT="/etc/squid3/cert.crt" \
-    SSL_KEY="/etc/squid3/cert.key"
+    HTTP_PORT=3142
 
-EXPOSE $HTTP_PORT $TRANSPARENT_PORT $SSL_BUMP_PORT
+EXPOSE $HTTP_PORT
 
 ENV PATH=$APP_ROOT/image/bin:$APP_ROOT/image/sbin:$PATH
 RUN ln -sfv "$APP_ROOT/image/entrypoint" /
