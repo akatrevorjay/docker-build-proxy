@@ -1,0 +1,19 @@
+#!/bin/bash
+set -eo pipefail
+[[ -z "$DEBUG" ]] || set -xv
+
+: ${SSL_INFO:="US\nOhio\nCleveland\nSkyWWW\nEngineering\n$HOSTNAME\n\n"}
+
+if [[ ! -f "$SSL_CERT" && ! -f "$SSL_KEY" ]]; then
+    echo "[$0] Generating SSL cert=$SSL_CERT key=$SSL_KEY"
+    echo -e "$SSL_INFO" \
+        | openssl req -x509 -nodes -days 3650 -newkey rsa:2048 -keyout "$SSL_KEY" -out "$SSL_CERT"
+    echo
+elif [[ ! -f "$SSL_CERT" || ! -f "$SSL_KEY" ]]; then
+    echo "ERROR: Missing either $SSL_CERT or $SSL_KEY" >&2
+    exit 1
+fi
+
+echo "[$0] Public cert follows:"
+cat "$SSL_CERT"
+echo

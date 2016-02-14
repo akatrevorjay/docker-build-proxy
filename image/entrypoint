@@ -2,37 +2,39 @@
 set -eo pipefail
 [[ -z "$DEBUG" ]] || set -xv
 
-_template_config() {
-    find "$CONFIG_DIR" "/usr/share/squid-deb-proxy" -type f \
-        | xargs sed -i.orig \
-            -e 's|/etc/squid-deb-proxy|$CONFIG_DIR|g' \
-            -e 's|/var/cache/squid-deb-proxy|$CACHE_DIR|g' \
-            -e 's|/var/log/squid-deb-proxy|$LOG_DIR|g' \
-            -e "s|\$CONFIG_DIR|$CONFIG_DIR|g" \
-            -e "s|\$CACHE_DIR|$CACHE_DIR|g" \
-            -e "s|\$LOG_DIR|$LOG_DIR|g"
-}
+generate-cert
 
-_start_emulate_events_and_tail_log() {
-    . /usr/share/squid-deb-proxy/init-common.sh
+logs=("$LOG_DIR/access.log" "$LOG_DIR/cache.log" "$LOG_DIR/store.log")
 
-    pre_start
-    "$@" &
-    if [[ "$TAIL_LOGS" == "true" ]]; then
-        tail -qF $LOG_DIR/{access,cache,store}.log &
-    fi
-    post_start
+if [[ "$LOG_FIFO" == "true" ]]; then
+    for log in "${logs[@]}"; do
+        echo "[$0] Creating log fifo: $log"
+        rm -f "$log"
+        mkfifo "$log"
+        chown proxy:proxy "$log"
+    done
+fi
 
-    # Wait for jobs to finish
-    wait -n
+CONFIG_TMPL_MARK="$CONFIG_DIR/.squid.conf-templated"
+if [[ ! -f "$CONFIG_DIR/squid.conf" || -f "$CONFIG_TMPL_MARK" ]]; then
+    echo "[$0] Templating squid.conf"
+    touch "$CONFIG_TMPL_MARK"
+    dockerize \
+        -template "$APP_ROOT/squid.conf.tmpl":"$CONFIG_DIR/squid.conf"
+fi
 
-    post_stop
-}
+if [[ "$1" = squid* ]]; then
+    set -- dockerize \
+        $(for log in "${logs[@]}"; do echo -e " -stdout \"$log\" "; done) \
+        "$@"
+fi
 
+if [[ -n "$TRANSPARENT_PORT" ]]; then
+    echo "[$0] Setting up transparent proxy DNAT in iptables"
+    # Setup the NAT rule that enables transparent proxying
+    IPADDR=$(/sbin/ip -o -f inet addr show eth0 | awk '{ sub(/\/.+/,"",$4); print $4 }')
+    iptables -t nat -A PREROUTING -p tcp --dport 80 -j DNAT --to-destination "${IPADDR}:${TRANSPARENT_PORT}"
+fi
 
-main() {
-    _template_config
-    _start_emulate_events_and_tail_log "$@"
-}
-
-main "$@"
+echo "exec:" "$@"
+exec "$@"

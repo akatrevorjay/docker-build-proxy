@@ -80,4 +80,5 @@ case "$self" in
 esac
 
 set -x
+export HTTP_PROXY="$DOCKER_BUILD_PROXY_HTTP"
 exec "$target" "$@"
