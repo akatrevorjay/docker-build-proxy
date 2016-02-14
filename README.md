@@ -2,9 +2,10 @@ docker-build-proxy
 ==================
 
 Ever get tired of waiting for your docker images to `apt-get update`?
-Yeah, me too.
 
-Use this with something similar to the provided wrapper around `docker` and `docker-compose`, which automatically add `--build-args` for `http_proxy` and `https_proxy`.
+Yeah, me too. So does Jenkins.
+
+Use this with something similar to the provided wrapper around `docker` and `docker-compose`, which automatically add `--build-args` for `http_proxy` and `https_proxy`. For `docker-compose`, you'll need to add in a blank passthrough build_arg for the proxy URLs, as shown in `docker-compose.build.yml`.
 
 Usage
 -----
