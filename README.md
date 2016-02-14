@@ -13,7 +13,7 @@ Usage
 Just use the `docker-compose.yml`:
 ```sh
 # Start proxy instance
-docker-compose up
+docker-compose up -d
 ```
 This compose file sets `restart=always`, making sure it's always available when you need it.
 *Due to this, the provided `docker-compose.yml` file requires `docker-compose`>=1.6.0 due to it's requirement on version 2 syntax.*
@@ -25,6 +25,8 @@ If you don't have one of these setup:
 mkdir -p "$HOME/bin"
 echo 'PATH="$HOME/bin:$PATH"' >> ~/.bashrc
 ```
+
+Viola.
 
 Troubleshooting
 ---------------
