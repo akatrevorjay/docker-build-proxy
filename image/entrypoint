@@ -2,41 +2,40 @@
 set -eo pipefail
 [[ -z "$DEBUG" ]] || set -xv
 
-logs=("$LOG_DIR/access.log" "$LOG_DIR/cache.log" "$LOG_DIR/store.log")
-
-if [[ "$LOG_FIFO" == "true" ]]; then
-    for log in "${logs[@]}"; do
-        echo "[$0] Creating log fifo: $log"
-        rm -f "$log"
-        mkfifo "$log"
-        chown proxy:proxy "$log"
-    done
+if [[ "$CONFIG_DIR" != "/etc/squid3" && -d "/etc/squid3" ]]; then
+    echo "[$0] Setting CONFIG_DIR=$CONFIG_DIR"
+    mv /etc/squid3 /etc/squid3.dist
+    ln -sf "$CONFIG_DIR" "/etc/squid3"
 fi
 
-CONFIG_TMPL_MARK="$CONFIG_DIR/.squid.conf-templated"
-if [[ ! -f "$CONFIG_DIR/squid.conf" || -f "$CONFIG_TMPL_MARK" ]]; then
-    echo "[$0] Templating squid.conf"
-    touch "$CONFIG_TMPL_MARK"
+if [[ ! -f "$CONFIG_DIR/squid.conf" ]]; then
+    echo "[$0] Creating $CONFIG_DIR/squid.conf from template $APP_ROOT/image/squid.conf.tmpl"
     dockerize \
-        -template "$APP_ROOT/squid.conf.tmpl":"$CONFIG_DIR/squid.conf"
+        -template "$APP_ROOT/image/squid.conf.tmpl":"$CONFIG_DIR/squid.conf"
 fi
 
-if [[ "$1" = squid* ]]; then
-    set -- dockerize \
-        $(for log in "${logs[@]}"; do echo -e " -stdout \"$log\" "; done) \
-        "$@"
+if [[ ! -d "$CACHE_DIR/00" ]]; then
+    echo "[$0] Creating CACHE_DIR=$CACHE_DIR"
+    $SQUID3 -N -z
 fi
 
 if [[ -n "$SSL_BUMP_PORT" ]]; then
-    generate-cert
+    : ${SSL_INFO:="US\nOhio\nCleveland\nSkyWWW\nEngineering\n$HOSTNAME\n\n"}
+
+    if [[ ! -f "$SSL_CERT" && ! -f "$SSL_KEY" ]]; then
+        echo "[$0] Generating SSL cert=$SSL_CERT key=$SSL_KEY"
+        echo -e "$SSL_INFO" \
+            | openssl req -x509 -nodes -days 3650 -newkey rsa:2048 -keyout "$SSL_KEY" -out "$SSL_CERT"
+        echo
+    elif [[ ! -f "$SSL_CERT" || ! -f "$SSL_KEY" ]]; then
+        echo "ERROR: Missing either $SSL_CERT or $SSL_KEY" >&2
+        exit 1
+    fi
+
+    echo "[$0] Public cert follows:"
+    cat "$SSL_CERT"
+    echo
 fi
 
-if [[ -n "$TRANSPARENT_PORT" ]]; then
-    echo "[$0] Setting up transparent proxy DNAT in iptables"
-    # Setup the NAT rule that enables transparent proxying
-    IPADDR=$(/sbin/ip -o -f inet addr show eth0 | awk '{ sub(/\/.+/,"",$4); print $4 }')
-    iptables -t nat -A PREROUTING -p tcp --dport 80 -j DNAT --to-destination "${IPADDR}:${TRANSPARENT_PORT}"
-fi
-
-echo "exec:" "$@"
 exec "$@"
+
