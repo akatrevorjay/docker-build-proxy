@@ -1,0 +1,13 @@
+version: '2'
+services:
+  app:
+    build:
+      context: .
+      args:
+        - http_proxy
+        - https_proxy
+    volumes:
+      - .:/app
+    ports:
+      - "3142:3142"
+
