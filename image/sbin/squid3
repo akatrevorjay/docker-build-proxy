@@ -1,0 +1,14 @@
+#!/bin/bash
+set -eo pipefail
+
+logs=("$LOG_DIR/access.log" "$LOG_DIR/cache.log" "$LOG_DIR/store.log")
+
+# Make sure log files exist
+touch "${logs[@]}"
+chown proxy:proxy "${logs[@]}"
+
+# Show log files on stdout as well
+tail -n 0 -qF "${logs[@]}" &
+
+# Don't exec so we keep our tailer going
+$SQUID3 "$@"

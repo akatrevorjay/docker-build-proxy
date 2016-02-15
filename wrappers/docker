@@ -22,50 +22,99 @@
 # Be safe wary traveller
 set -eo pipefail
 
-# Nab docker-machine vars if necessary
-if [[ -n "$DOCKER_MACHINE_NAME" ]]; then
-    # Cache the output so we don't have to run it every time (per machine)
-    : ${DOCKER_MACHINE_ENV_CACHE:="true"}
-    # (cache is stored per docker-machine)
-    : ${DOCKER_MACHINE_ENV_CACHE_FILE:="$HOME/.docker-machine-env-cache-$DOCKER_MACHINE_NAME"}
+# Allow to debug
+[[ -z "$DOCKER_WRAPPER_DEBUG" ]] || set -xv
 
-    docker-machine-env() {
-        docker-machine env "$DOCKER_MACHINE_NAME"
+docker_machine_env() {
+    # Only do this if we have to
+    [[ -z "$DOCKER_HOST" ]] || return 0
+
+    local name="${DOCKER_MACHINE_NAME:-dev}"
+    [[ -n "$name" ]] || return 0
+
+    # docker-machine is rather slow to grab the env every time, especially for tab completion,
+    # so the resulting env is able to be cached per machine.
+    local cache="${DOCKER_MACHINE_ENV_CACHE:-true}"
+    local cache_file="${DOCKER_MACHINE_ENV_CACHE_FILE:-"$HOME/.docker-machine-env-cache"}"
+
+    # (cache is stored per docker-machine)
+    cache_file+="-$name"
+
+    # If cache is turned off, just remove the cache_file var to make it easy
+    [[ "$cache" == "true" ]] || cache_file=""
+
+    docker_machine_env() {
+        docker-machine env "$name"
     }
 
-    # If we need to eval docker-machine env, do so
-    if [[ -z "$DOCKER_HOST" ]]; then
-        if [[ "$DOCKER_MACHINE_ENV_CACHE" == "true" ]]; then
-            [[ -f "$DOCKER_MACHINE_ENV_CACHE_FILE" ]] \
-                || docker-machine-env > "$DOCKER_MACHINE_ENV_CACHE_FILE"
-            source "$DOCKER_MACHINE_ENV_CACHE_FILE"
-        else
-            source <(docker-machine-env)
-        fi
+    if [[ -n "$cache_file" ]]; then
+        [[ -f "$cache_file" ]] \
+            || docker_machine_env > "$cache_file"
+        source "$cache_file"
+    else
+        source <(docker_machine_env)
     fi
-fi
+}
+
+is_port_open() {
+    local url="$1"
+    debug "Checking if $url is open"
+
+    set -- $(split_url "$url")
+    local proto="$1" addr="$2"
+
+    [[ -n "$proto" ]] || death "No proto found for service $name"
+    [[ -n "$addr" ]] || death "No addr found for service $name"
+
+    local nc="nc -z"
+    case "$proto" in
+        unix)
+            $nc -U "$addr" ;;
+        udp)
+            nc+=" -u" ;;&
+        http|tcp)
+            local host="${addr%:*}" port="${url##*:}"
+            [[ -n "$host" ]] || death "No host found for service $name"
+            [[ -n "$port" ]] || death "No port found for service $name"
+            $nc "$host" "$port" ;;
+        *)
+            death "Unknown proto $proto" ;;
+    esac
+}
+
+wrap_bin() {
+    local wrapped="$1"
+    local base="$(basename "$wrapped")"
+    local abs="$(realpath -es "$wrapped")"
+
+    # Get our target
+    local path path_abs target
+    for path in $(type -pa "$base"); do
+        # Verify absolute paths don't match ourselves (fruity loops detection)
+        path_abs="$(realpath -es "$path")"
+        [[ "$path_abs" != "$abs" ]] || continue
+
+        # We have a winner
+        echo "$path"
+        return
+    done
+
+    echo "Could not find wrapped target \"$base\" in PATH." >&2
+    return 1
+}
+
+# Nab docker-machine vars if necessary
+docker_machine_env
 
 # Override these in your .bashrc if you want.
-: ${DOCKER_BUILD_HTTP_PROXY:="http://$DOCKER_HOST:$PROXY_PORT"}
+: ${DOCKER_BUILD_HTTP_PROXY_PORT:=3142}
+: ${DOCKER_BUILD_HTTP_PROXY:="http://$DOCKER_HOST:$DOCKER_BUILD_HTTP_PROXY_PORT"}
+
+# Become self-aware
+self="$(basename "$0")"
 
 # Find wrapped executable in PATH
-self=$(basename "$0")
-abs_self=$(realpath -es "$0")
-
-# Get our target
-for path in $(type -pa "$self"); do
-    # Verify absolute paths don't match ourselves (fruity loops detection)
-    abs_path=$(realpath -es "$path")
-    [[ "$abs_path" != "$abs_self" ]] || continue
-
-    # We have a winner
-    target="$path"
-    break
-done
-
-# Assert target
-[[ -n "$target" ]] \
-    || (echo "Could not find wrapped target \"$self\" in PATH." >&2; exit 1)
+target="$(wrap_bin "$0")"
 
 # Target specifics
 case "$self" in
@@ -77,7 +126,8 @@ case "$self" in
         #   args:
         #     - http_proxy
         #
-        if [[ $1 == 'build' && -z "$NOPROXY" ]]; then
+        if [[ "$1" == 'build' && -z "$NOPROXY" ]] && is_port_open "$DOCKER_BUILD_HTTP_PROXY"; then
+            export HTTP_PROXY="$DOCKER_BUILD_HTTP_PROXY"
             set -- "$1" \
                 --build-arg http_proxy="$DOCKER_BUILD_HTTP_PROXY" \
                 "${@:2}"
