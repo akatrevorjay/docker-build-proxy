@@ -25,6 +25,19 @@ set -eo pipefail
 # Allow to debug
 [[ -z "$DOCKER_WRAPPER_DEBUG" ]] || set -xv
 
+# Become self-aware
+self="$(basename "$0")"
+
+function _script_echo   { echo "[$(date)] $0[$$]" "${@:2}" "#$1"; }
+function debug          { [[ -z "$ENTRYPOINT_DEBUG" ]] || _script_echo DEBUG "$@"; }
+function e              { [[ -n "$ENTRYPOINT_QUIET" ]] || _script_echo INFO "$@"; }
+function info           { e "$@"; }
+function warn           { [[ -n "$ENTRYPOINT_QUIET" ]] || _script_echo WARNING "$@"; }
+function warning        { warn "$@"; }
+function error          { _script_echo ERROR "$@" >&2; }
+function death          { error "$@"; exit 1; }
+function debug_call     { debug 'call:' "$@"; "$@"; }
+
 docker_machine_env() {
     # Only do this if we have to
     [[ -z "$DOCKER_HOST" ]] || return 0
@@ -54,6 +67,10 @@ docker_machine_env() {
     else
         source <(docker_machine_env)
     fi
+}
+
+function split_url {
+    echo "${1%%://*}" "${1#*://}"
 }
 
 is_port_open() {

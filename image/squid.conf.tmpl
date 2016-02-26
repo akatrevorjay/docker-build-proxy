@@ -52,7 +52,8 @@ cache_replacement_policy heap LFUDA
 # tweaks to speed things up
 cache_mem {{ .Env.CACHE_MEM }}
 maximum_object_size_in_memory {{ .Env.MAX_OBJECT_SIZE_IN_MEMORY }}
-memory_replacement_policy heap GDSF  # Greedy-Dual Size Frequency
+# Greedy-Dual Size Frequency
+memory_replacement_policy heap GDSF
 
 # pid
 #pid_filename /var/run/docker-build-proxy.pid

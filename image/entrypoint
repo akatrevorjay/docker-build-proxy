@@ -20,7 +20,7 @@ if [[ ! -d "$CACHE_DIR/00" ]]; then
 fi
 
 if [[ -n "$SSL_BUMP_PORT" ]]; then
-    : ${SSL_INFO:="US\nOhio\nCleveland\nSkyWWW\nEngineering\n$HOSTNAME\n\n"}
+    : "${SSL_INFO:="US\nOhio\nCleveland\nSkyWWW\nEngineering\n$HOSTNAME\n\n"}"
 
     if [[ ! -f "$SSL_CERT" && ! -f "$SSL_KEY" ]]; then
         echo "[$0] Generating SSL cert=$SSL_CERT key=$SSL_KEY"
@@ -37,5 +37,6 @@ if [[ -n "$SSL_BUMP_PORT" ]]; then
     echo
 fi
 
+echo "exec:" "$@"
 exec "$@"
 
